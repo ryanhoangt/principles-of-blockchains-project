@@ -1,8 +1,13 @@
-use rand::Rng;
-use ring::signature::{self, Ed25519KeyPair, Signature};
+use ring::{
+    digest,
+    signature::{self, Ed25519KeyPair, Signature},
+};
 use serde::{Deserialize, Serialize};
 
-use super::address::Address;
+use super::{
+    address::Address,
+    hash::{Hashable, H256},
+};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Transaction {
@@ -12,7 +17,18 @@ pub struct Transaction {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct SignedTransaction {}
+pub struct SignedTransaction {
+    transaction: Transaction,
+    signature: Vec<u8>,
+    public_key: Vec<u8>,
+}
+
+impl Hashable for SignedTransaction {
+    fn hash(&self) -> H256 {
+        let serialized_signed_tx = bincode::serialize(self).unwrap();
+        digest::digest(&digest::SHA256, &serialized_signed_tx).into()
+    }
+}
 
 /// Create digital signature of a transaction
 pub fn sign(t: &Transaction, key: &Ed25519KeyPair) -> Signature {
@@ -34,6 +50,8 @@ pub fn verify(t: &Transaction, public_key: &[u8], signature: &[u8]) -> bool {
 
 #[cfg(any(test, test_utilities))]
 pub fn generate_random_transaction() -> Transaction {
+    use rand::Rng;
+
     let mut rng = rand::thread_rng();
     let random_pub_key_1: [u8; 32] = [rng.gen(); 32];
     let random_pub_key_2: [u8; 32] = [rng.gen(); 32];
