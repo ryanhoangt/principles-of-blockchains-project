@@ -5,5 +5,19 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "./interfaces/IPriceFeed.sol";
 
 contract PriceFeed is IPriceFeed {
-    /* TODO: implement your functions here */
+
+    AggregatorV3Interface internal priceFeed;
+
+    constructor(address proxy) {
+        priceFeed = AggregatorV3Interface(proxy);
+    }
+
+    function getLatestPrice() override external view returns (
+        int price,
+        uint lastUpdatedTime
+    ) {
+        ( , int256 answer, , uint256 updatedAt, ) =  priceFeed.latestRoundData();
+        price = answer;
+        lastUpdatedTime = updatedAt;
+    }
 }
