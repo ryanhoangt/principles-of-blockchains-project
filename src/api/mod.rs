@@ -1,8 +1,8 @@
-use serde::Serialize;
 use crate::blockchain::Blockchain;
 use crate::miner::Handle as MinerHandle;
-use crate::network::server::Handle as NetworkServerHandle;
 use crate::network::message::Message;
+use crate::network::server::Handle as NetworkServerHandle;
+use serde::Serialize;
 
 use log::info;
 use std::collections::HashMap;
@@ -15,7 +15,7 @@ use url::Url;
 
 pub struct Server {
     handle: HTTPServer,
-    miner: MinerHandle,
+    miner: MinerHandle, // handle for sending signal to miner thread
     network: NetworkServerHandle,
     blockchain: Arc<Mutex<Blockchain>>,
 }
@@ -112,7 +112,8 @@ impl Server {
                         "/blockchain/longest-chain" => {
                             let blockchain = blockchain.lock().unwrap();
                             let v = blockchain.all_blocks_in_longest_chain();
-                            let v_string: Vec<String> = v.into_iter().map(|h|h.to_string()).collect();
+                            let v_string: Vec<String> =
+                                v.into_iter().map(|h| h.to_string()).collect();
                             respond_json!(req, v_string);
                         }
                         "/blockchain/longest-chain-tx" => {

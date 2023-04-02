@@ -15,7 +15,7 @@ pub struct Header {
     pub parent: H256,
     pub nonce: u32,
     pub difficulty: H256,
-    pub timestamp: u128, // unix time timestamp in second
+    pub timestamp: u128, // unix time timestamp in millis (for block delay measurement)
     pub merkle_root: H256,
 }
 

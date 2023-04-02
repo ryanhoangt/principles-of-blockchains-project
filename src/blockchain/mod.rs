@@ -7,10 +7,10 @@ use crate::types::merkle::MerkleTree;
 use crate::types::transaction::SignedTransaction;
 
 pub struct Blockchain {
-    tip: H256,
-    max_len: u128,
-    hash_to_block: HashMap<H256, Block>, // in-memory storage
-    hash_to_len: HashMap<H256, u128>,
+    pub tip: H256,
+    pub max_len: u128,
+    pub hash_to_block: HashMap<H256, Block>, // in-memory storage
+    pub hash_to_len: HashMap<H256, u128>,
 }
 
 impl Blockchain {
@@ -24,7 +24,7 @@ impl Blockchain {
         let genesis_header = Header {
             parent: [0u8; 32].into(),
             nonce: 0u32,
-            difficulty: H256::from([0u8; 32]),
+            difficulty: H256::from([255u8; 32]),
             timestamp: genesis_time,
             merkle_root: MerkleTree::new(&genesis_data).root(),
         };

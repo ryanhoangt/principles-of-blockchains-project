@@ -3,15 +3,24 @@ pub mod worker;
 use log::info;
 
 use crossbeam::channel::{unbounded, Receiver, Sender, TryRecvError};
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::time;
 
 use std::thread;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
+use crate::blockchain::Blockchain;
 use crate::types::block::Block;
+use crate::types::block::Content;
+use crate::types::block::Header;
+use crate::types::hash::Hashable;
+use crate::types::merkle::MerkleTree;
 
 enum ControlSignal {
     Start(u64), // the number controls the lambda of interval between block generation
-    Update, // update the block in mining, it may due to new blockchain tip or new transaction
+    Update,     // update the block in mining, it may due to new blockchain tip or new transaction
     Exit,
 }
 
@@ -21,20 +30,22 @@ enum OperatingState {
     ShutDown,
 }
 
+/// Miner thread context
 pub struct Context {
-    /// Channel for receiving control signal
+    /// Channel for receiving control signal from API server
     control_chan: Receiver<ControlSignal>,
     operating_state: OperatingState,
     finished_block_chan: Sender<Block>,
+    blockchain: Arc<Mutex<Blockchain>>,
 }
 
 #[derive(Clone)]
 pub struct Handle {
-    /// Channel for sending signal to the miner thread
+    /// Channel for sending signal to the miner thread, used by API server
     control_chan: Sender<ControlSignal>,
 }
 
-pub fn new() -> (Context, Handle, Receiver<Block>) {
+pub fn new(blockchain: &Arc<Mutex<Blockchain>>) -> (Context, Handle, Receiver<Block>) {
     let (signal_chan_sender, signal_chan_receiver) = unbounded();
     let (finished_block_sender, finished_block_receiver) = unbounded();
 
@@ -42,6 +53,7 @@ pub fn new() -> (Context, Handle, Receiver<Block>) {
         control_chan: signal_chan_receiver,
         operating_state: OperatingState::Paused,
         finished_block_chan: finished_block_sender,
+        blockchain: Arc::clone(blockchain),
     };
 
     let handle = Handle {
@@ -51,9 +63,11 @@ pub fn new() -> (Context, Handle, Receiver<Block>) {
     (ctx, handle, finished_block_receiver)
 }
 
-#[cfg(any(test,test_utilities))]
+#[cfg(any(test, test_utilities))]
 fn test_new() -> (Context, Handle, Receiver<Block>) {
-    new()
+    let blockchain = Blockchain::new();
+    let blockchain = Arc::new(Mutex::new(blockchain));
+    new(&blockchain)
 }
 
 impl Handle {
@@ -73,6 +87,7 @@ impl Handle {
 }
 
 impl Context {
+    /// Spawn miner thread in paused mode
     pub fn start(mut self) {
         thread::Builder::new()
             .name("miner".to_string())
@@ -84,6 +99,16 @@ impl Context {
     }
 
     fn miner_loop(&mut self) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        let _blockchain = self.blockchain.lock().unwrap();
+        let mut _parent_hash = _blockchain.tip();
+        let _difficulty = _blockchain.hash_to_block[&_parent_hash].get_difficulty();
+
+        // drop the mutex guard for other thread to access
+        drop(_blockchain);
+
         // main mining loop
         loop {
             // check and react to control signals
@@ -116,11 +141,11 @@ impl Context {
                                 self.operating_state = OperatingState::ShutDown;
                             }
                             ControlSignal::Start(i) => {
-                                info!("Miner starting in continuous mode with lambda {}", i);
+                                info!("Miner restarting in continuous mode with lambda {}", i);
                                 self.operating_state = OperatingState::Run(i);
                             }
                             ControlSignal::Update => {
-                                unimplemented!()
+                                _parent_hash = self.blockchain.lock().unwrap().tip();
                             }
                         };
                     }
@@ -132,8 +157,31 @@ impl Context {
                 return;
             }
 
-            // TODO for student: actual mining, create a block
-            // TODO for student: if block mining finished, you can have something like: self.finished_block_chan.send(block.clone()).expect("Send finished block error");
+            // actual mining, create a block
+            let _signed_txs = vec![];
+
+            let _candidate_block = Block {
+                header: Header {
+                    parent: _parent_hash,
+                    difficulty: _difficulty,
+                    timestamp: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis(),
+                    nonce: rng.gen(),
+                    merkle_root: MerkleTree::new(&_signed_txs).root(),
+                },
+                content: Content { data: _signed_txs },
+            };
+
+            // check if block is successfully generated
+            if _candidate_block.hash() <= _difficulty {
+                self.finished_block_chan
+                    .send(_candidate_block.clone())
+                    .expect("Send finished block error");
+
+                _parent_hash = _candidate_block.hash();
+            }
 
             if let OperatingState::Run(i) = self.operating_state {
                 if i != 0 {
@@ -149,8 +197,8 @@ impl Context {
 
 #[cfg(test)]
 mod test {
-    use ntest::timeout;
     use crate::types::hash::Hashable;
+    use ntest::timeout;
 
     #[test]
     #[timeout(60000)]
