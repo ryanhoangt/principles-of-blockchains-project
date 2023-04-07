@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::types::{hash::H256, block::Block, transaction::SignedTransaction};
+use crate::types::{block::Block, hash::H256, transaction::SignedTransaction};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {

@@ -76,7 +76,7 @@ fn main() {
             error!("Error parsing P2P workers: {}", e);
             process::exit(1);
         });
-    let worker_ctx = network::worker::Worker::new(p2p_workers, msg_rx, &server);
+    let worker_ctx = network::worker::Worker::new(p2p_workers, msg_rx, &server, &blockchain);
     worker_ctx.start();
 
     // start the miner
